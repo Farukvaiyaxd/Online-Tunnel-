@@ -1,0 +1,26 @@
+[
+    {
+        "merged": "com.tritunnel.app-debug-40:/drawable_ic_launcher_foreground.xml.flat",
+        "source": "com.tritunnel.app-main-42:/drawable/ic_launcher_foreground.xml"
+    },
+    {
+        "merged": "com.tritunnel.app-debug-40:/mipmap-anydpi_ic_launcher_round.xml.flat",
+        "source": "com.tritunnel.app-main-42:/mipmap-anydpi/ic_launcher_round.xml"
+    },
+    {
+        "merged": "com.tritunnel.app-debug-40:/mipmap-anydpi_ic_launcher.xml.flat",
+        "source": "com.tritunnel.app-main-42:/mipmap-anydpi/ic_launcher.xml"
+    },
+    {
+        "merged": "com.tritunnel.app-debug-40:/mipmap-anydpi-v26_ic_launcher.xml.flat",
+        "source": "com.tritunnel.app-main-42:/mipmap-anydpi-v26/ic_launcher.xml"
+    },
+    {
+        "merged": "com.tritunnel.app-debug-40:/mipmap-anydpi-v26_ic_launcher_round.xml.flat",
+        "source": "com.tritunnel.app-main-42:/mipmap-anydpi-v26/ic_launcher_round.xml"
+    },
+    {
+        "merged": "com.tritunnel.app-debug-40:/drawable_ic_launcher_full.xml.flat",
+        "source": "com.tritunnel.app-main-42:/drawable/ic_launcher_full.xml"
+    }
+]

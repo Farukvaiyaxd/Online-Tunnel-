@@ -7,11 +7,11 @@ import com.tritunnel.app.data.ServerConfig
 import java.util.Properties
 
 /**
- * SSH tunnel — JSch দিয়ে রিমোট সার্ভারে কানেক্ট করে এবং
- * dynamic port forwarding (-D) দিয়ে একটা লোকাল SOCKS5 proxy খোলে।
+ * SSH tunnel — JSch দিয়ে রিমোট সার্ভারে কানেক্ট করে ও লগইন যাচাই করে।
  *
- * এর ফলে 127.0.0.1:<localSocksPort>-এ একটা SOCKS5 proxy পাওয়া যায়,
- * যার সব ট্রাফিক এনক্রিপ্ট হয়ে SSH সার্ভার দিয়ে যায়।
+ * Milestone 1: কানেকশন ও authentication কাজ করে নিশ্চিত করা হয়।
+ * পরের ধাপে এর উপর SOCKS5 proxy + VpnService রাউটিং যোগ হবে
+ * (এর জন্য dynamic forwarding সাপোর্ট করে এমন SSH লাইব্রেরি ব্যবহার করা হবে)।
  */
 class SshTunnel(
     private val config: ServerConfig,
@@ -33,11 +33,8 @@ class SshTunnel(
         s.setConfig(props)
 
         s.connect(20_000)
-        onLog("SSH: লগইন সফল ✓")
-
-        // dynamic SOCKS5 proxy চালু করা
-        s.setPortForwardingD(localSocksPort)
-        onLog("SOCKS5 proxy চালু: 127.0.0.1:$localSocksPort")
+        onLog("SSH: লগইন সফল ✓ (সার্ভারের সাথে সংযোগ তৈরি হয়েছে)")
+        onLog("নোট: পুরো-ফোন রাউটিং পরের ধাপে যোগ হবে।")
 
         session = s
     }

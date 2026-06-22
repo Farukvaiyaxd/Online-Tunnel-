@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ic_launcher_background">#0B3D2E</color>
+    <string name="app_name">TriTunnel</string>
+    <style name="Theme.TriTunnel" parent="android:Theme.Material.Light.NoActionBar"/>
+</resources>
