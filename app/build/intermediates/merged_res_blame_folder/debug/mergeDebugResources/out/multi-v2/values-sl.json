@@ -1,7 +1,7 @@
 {
     "logs": [
         {
-            "outputFile": "com.tritunnel.app-mergeDebugResources-38:/values-sl/values-sl.xml",
+            "outputFile": "com.tritunnel.app-mergeDebugResources-45:/values-sl/values-sl.xml",
             "map": [
                 {
                     "source": "/root/.gradle/caches/transforms-4/9c09bba0afbdcfa3f9923e85ee633245/transformed/ui-release/res/values-sl/values-sl.xml",

@@ -5,6 +5,7 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
 
     <application
         android:allowBackup="true"
@@ -23,11 +24,17 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- Deep link: tritunnel://add?config=JSON (web panel integration) -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="tritunnel" android:host="add" />
+            </intent-filter>
         </activity>
 
-        <!-- VpnService — পুরো ফোনের ট্রাফিক tunnel-এ পাঠানোর জন্য (পরের ধাপে রাউটিং যোগ হবে) -->
         <service
-            android:name=".service.AppVpnService"
+            android:name=".service.VpnTunnelService"
             android:exported="false"
             android:permission="android.permission.BIND_VPN_SERVICE">
             <intent-filter>
