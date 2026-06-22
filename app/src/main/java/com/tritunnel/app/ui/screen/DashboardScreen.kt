@@ -97,12 +97,12 @@ fun DashboardScreen(vm: VpnViewModel) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                "TRITUNNEL",
+                "ONLINE TUNNEL",
                 color = NeonCyan,
-                fontSize = 18.sp,
+                fontSize = 16.sp,
                 fontWeight = FontWeight.Black,
                 fontFamily = FontFamily.Monospace,
-                letterSpacing = 4.sp,
+                letterSpacing = 3.sp,
             )
             AnimatedVisibility(!hasNetwork, enter = fadeIn(), exit = fadeOut()) {
                 Icon(Icons.Default.SignalWifiOff, null, tint = NeonRed, modifier = Modifier.size(22.dp))

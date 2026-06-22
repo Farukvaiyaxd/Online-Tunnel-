@@ -11,21 +11,30 @@ import android.os.ParcelFileDescriptor
 import androidx.core.app.NotificationCompat
 import com.tritunnel.app.MainActivity
 import com.tritunnel.app.data.VpnConfig
+import com.tritunnel.app.tunnel.TcpTunnel
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import org.json.JSONObject
+import java.net.DatagramSocket
 
 class VpnTunnelService : VpnService() {
 
     private var vpnInterface: ParcelFileDescriptor? = null
+    private var tunnel: TcpTunnel? = null
+    private val serviceJob = SupervisorJob()
+    private val serviceScope = CoroutineScope(serviceJob + Dispatchers.IO)
 
     enum class ServiceState { DISCONNECTED, CONNECTING, CONNECTED }
 
     companion object {
-        const val ACTION_CONNECT = "com.tritunnel.CONNECT"
-        const val ACTION_DISCONNECT = "com.tritunnel.DISCONNECT"
+        const val ACTION_CONNECT = "com.onlinetunnel.CONNECT"
+        const val ACTION_DISCONNECT = "com.onlinetunnel.DISCONNECT"
         const val EXTRA_CONFIG = "extra_config_json"
-        const val CHANNEL_ID = "tritunnel_vpn"
+        const val CHANNEL_ID = "online_tunnel_vpn"
         const val NOTIF_ID = 1001
 
         private val _state = MutableStateFlow(ServiceState.DISCONNECTED)
@@ -51,32 +60,47 @@ class VpnTunnelService : VpnService() {
         _state.value = ServiceState.CONNECTING
         activeConfig = config
         createNotificationChannel()
-        startForeground(NOTIF_ID, buildNotification("Connecting...", config.name))
+        startForeground(NOTIF_ID, buildNotification(
+            "Connecting...", "Online Tunnel • ${config.name}", ServiceState.CONNECTING
+        ))
 
         try {
             val builder = Builder()
-                .setSession("TriTunnel")
+                .setSession("Online Tunnel")
                 .addAddress("10.8.0.2", 24)
                 .addRoute("0.0.0.0", 0)       // Route all IPv4
                 .addDnsServer("1.1.1.1")
                 .addDnsServer("8.8.8.8")
                 .setMtu(1500)
-                .addDisallowedApplication(packageName) // prevent routing loop
+                .addDisallowedApplication(packageName)
 
-            vpnInterface = builder.establish()
+            val iface = builder.establish()
+            vpnInterface = iface
 
-            if (vpnInterface != null) {
+            if (iface != null) {
+                // Start packet tunnel
+                tunnel = TcpTunnel(
+                    fd = iface.fileDescriptor,
+                    config = config,
+                    protectTcp = { socket -> protect(socket) },
+                    protectUdp = { socket -> protectDatagram(socket) },
+                    scope = serviceScope,
+                )
+                tunnel?.start()
+
                 _state.value = ServiceState.CONNECTED
-                startForeground(NOTIF_ID, buildNotification("🔒 Connected", "${config.name} • ${config.host}"))
+                val nm = getSystemService(NotificationManager::class.java)
+                nm.notify(NOTIF_ID, buildNotification(
+                    "Connected",
+                    "${config.name} • ${config.host}:${config.port}",
+                    ServiceState.CONNECTED
+                ))
             } else {
                 _state.value = ServiceState.DISCONNECTED
                 activeConfig = null
                 stopSelf()
             }
-            // NOTE: Actual packet forwarding (SNI bypass, VMESS/Trojan tunneling)
-            // requires integrating a native core (Xray/sing-box AAR).
-            // The TUN interface is established here — traffic routing point is ready.
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             _state.value = ServiceState.DISCONNECTED
             activeConfig = null
             stopForeground(STOP_FOREGROUND_REMOVE)
@@ -85,6 +109,8 @@ class VpnTunnelService : VpnService() {
     }
 
     private fun doDisconnect() {
+        tunnel?.stop()
+        tunnel = null
         runCatching { vpnInterface?.close() }
         vpnInterface = null
         _state.value = ServiceState.DISCONNECTED
@@ -93,34 +119,77 @@ class VpnTunnelService : VpnService() {
         stopSelf()
     }
 
+    private fun protectDatagram(socket: DatagramSocket): Boolean = protect(socket)
+
     override fun onRevoke() { doDisconnect(); super.onRevoke() }
-    override fun onDestroy() { doDisconnect(); super.onDestroy() }
+
+    override fun onDestroy() {
+        serviceJob.cancel()
+        doDisconnect()
+        super.onDestroy()
+    }
+
+    // ── Notification ─────────────────────────────────────────────────────────
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val ch = NotificationChannel(CHANNEL_ID, "VPN Status", NotificationManager.IMPORTANCE_LOW)
+            val ch = NotificationChannel(
+                CHANNEL_ID, "Online Tunnel VPN",
+                NotificationManager.IMPORTANCE_DEFAULT
+            ).apply {
+                description = "VPN connection status"
+                setShowBadge(false)
+            }
             getSystemService(NotificationManager::class.java).createNotificationChannel(ch)
         }
     }
 
-    private fun buildNotification(title: String, text: String): Notification {
-        val pi = PendingIntent.getActivity(
+    private fun buildNotification(title: String, text: String, state: ServiceState): Notification {
+        val openPi = PendingIntent.getActivity(
             this, 0, Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        val stopPi = PendingIntent.getService(
+        val disconnectPi = PendingIntent.getService(
             this, 1,
             Intent(this, VpnTunnelService::class.java).apply { action = ACTION_DISCONNECT },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        return NotificationCompat.Builder(this, CHANNEL_ID)
+        val cancelPi = PendingIntent.getService(
+            this, 2,
+            Intent(this, VpnTunnelService::class.java).apply { action = ACTION_DISCONNECT },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_lock_lock)
             .setContentTitle(title)
             .setContentText(text)
-            .setContentIntent(pi)
-            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Disconnect", stopPi)
+            .setContentIntent(openPi)
             .setOngoing(true)
-            .build()
-    }
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
 
+        when (state) {
+            ServiceState.CONNECTING -> {
+                builder.setProgress(0, 0, true)
+                builder.addAction(
+                    android.R.drawable.ic_menu_close_clear_cancel,
+                    "Cancel", cancelPi
+                )
+            }
+            ServiceState.CONNECTED -> {
+                builder.addAction(
+                    android.R.drawable.ic_lock_lock,
+                    "Disconnect", disconnectPi
+                )
+                builder.addAction(
+                    android.R.drawable.ic_menu_close_clear_cancel,
+                    "Cancel", cancelPi
+                )
+            }
+            ServiceState.DISCONNECTED -> {}
+        }
+
+        return builder.build()
+    }
 }

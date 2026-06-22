@@ -109,6 +109,27 @@ class VpnViewModel(application: Application) : AndroidViewModel(application) {
 
     fun exportServers(secure: Boolean) = configRepo.exportJson(_servers.value, secure)
 
+    fun importFromUrl(url: String): VpnConfig? = VpnConfig.parseUrl(url)
+
+    fun checkServerOnline(
+        host: String,
+        port: Int,
+        onResult: (online: Boolean, latencyMs: Long) -> Unit,
+    ) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val t0 = System.currentTimeMillis()
+            try {
+                java.net.Socket().use { s ->
+                    s.connect(java.net.InetSocketAddress(host, port), 5_000)
+                    val ms = System.currentTimeMillis() - t0
+                    withContext(Dispatchers.Main) { onResult(true, ms) }
+                }
+            } catch (_: Exception) {
+                withContext(Dispatchers.Main) { onResult(false, -1L) }
+            }
+        }
+    }
+
     // ─── VPN Connection ───────────────────────────────────────────────────────
 
     fun connect(context: Context) {

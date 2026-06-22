@@ -152,7 +152,7 @@ fun SettingsScreen(vm: VpnViewModel) {
         }
 
         // ── App Info ──────────────────────────────────────────────────────────
-        Text("TriTunnel v0.2.0", color = TextSecondary.copy(alpha = 0.5f),
+        Text("Online Tunnel v1.0.0", color = TextSecondary.copy(alpha = 0.5f),
             fontSize = 11.sp, fontFamily = FontFamily.Monospace)
         Spacer(Modifier.height(40.dp))
     }

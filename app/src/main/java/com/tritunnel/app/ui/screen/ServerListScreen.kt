@@ -20,9 +20,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.IosShare
 import androidx.compose.material.icons.filled.NetworkCheck
@@ -30,7 +33,10 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -69,14 +75,78 @@ fun ServerListScreen(
     var deleteTarget by remember { mutableStateOf<VpnConfig?>(null) }
     var showExport by remember { mutableStateOf(false) }
 
+    // Import URL state
+    var showImportDialog by remember { mutableStateOf(false) }
+    var importUrlText by remember { mutableStateOf("") }
+    var importUrlError by remember { mutableStateOf("") }
+
+    if (showImportDialog) {
+        val tfColors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = NeonCyan, unfocusedBorderColor = DividerColor,
+            focusedLabelColor = NeonCyan, unfocusedLabelColor = TextSecondary,
+            cursorColor = NeonCyan, focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary,
+        )
+        AlertDialog(
+            onDismissRequest = { showImportDialog = false; importUrlError = "" },
+            containerColor = CyberSurface,
+            title = {
+                Text("Import Server URL", color = NeonCyan,
+                    fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("VLESS / VMess / Trojan URL পেস্ট করুন",
+                        color = TextSecondary, fontSize = 12.sp)
+                    OutlinedTextField(
+                        value = importUrlText,
+                        onValueChange = { importUrlText = it; importUrlError = "" },
+                        placeholder = { Text("vless://...", color = TextSecondary.copy(alpha = 0.4f), fontSize = 11.sp) },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = tfColors,
+                        shape = RoundedCornerShape(8.dp),
+                        minLines = 3, maxLines = 5,
+                    )
+                    if (importUrlError.isNotBlank()) {
+                        Text(importUrlError, color = NeonRed, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val cfg = vm.importFromUrl(importUrlText.trim())
+                    if (cfg != null) {
+                        vm.addOrUpdateServer(cfg)
+                        showImportDialog = false
+                        importUrlText = ""
+                        importUrlError = ""
+                    } else {
+                        importUrlError = "URL পার্স করা গেল না। সঠিক URL দিন।"
+                    }
+                }) { Text("Import & Save", color = NeonCyan, fontWeight = FontWeight.Bold) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showImportDialog = false; importUrlError = "" }) {
+                    Text("Cancel", color = TextSecondary)
+                }
+            }
+        )
+    }
+
     Scaffold(
         containerColor = CyberBg,
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = onAddServer,
-                containerColor = NeonCyan,
-                contentColor = CyberBg
-            ) { Icon(Icons.Default.Add, null) }
+            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                SmallFloatingActionButton(
+                    onClick = { showImportDialog = true },
+                    containerColor = CyberSurface,
+                    contentColor = NeonCyan,
+                ) { Icon(Icons.Default.ContentPaste, null, modifier = Modifier.size(18.dp)) }
+                FloatingActionButton(
+                    onClick = onAddServer,
+                    containerColor = NeonCyan,
+                    contentColor = CyberBg
+                ) { Icon(Icons.Default.Add, null) }
+            }
         }
     ) { pad ->
         Column(Modifier.fillMaxSize().padding(pad).background(CyberBg)) {

@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -17,6 +18,12 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.ContentPaste
+import androidx.compose.material.icons.filled.NetworkCheck
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -27,6 +34,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -34,7 +42,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -46,7 +56,9 @@ import com.tritunnel.app.data.VpnConfig
 import com.tritunnel.app.ui.theme.CyberBg
 import com.tritunnel.app.ui.theme.CyberSurface
 import com.tritunnel.app.ui.theme.DividerColor
+import com.tritunnel.app.ui.theme.NeonBlue
 import com.tritunnel.app.ui.theme.NeonCyan
+import com.tritunnel.app.ui.theme.NeonRed
 import com.tritunnel.app.ui.theme.TextPrimary
 import com.tritunnel.app.ui.theme.TextSecondary
 import com.tritunnel.app.ui.viewmodel.VpnViewModel
@@ -73,20 +85,101 @@ fun AddServerScreen(
     var lat by remember { mutableStateOf(existingConfig?.latitude?.toString() ?: "0.0") }
     var lon by remember { mutableStateOf(existingConfig?.longitude?.toString() ?: "0.0") }
 
+    // Import URL state
+    var showImportDialog by remember { mutableStateOf(false) }
+    var importUrl by remember { mutableStateOf("") }
+    var importError by remember { mutableStateOf("") }
+
+    // Server check state
+    var checkStatus by remember { mutableStateOf("") }
+    var checkLoading by remember { mutableStateOf(false) }
+
     val colors = OutlinedTextFieldDefaults.colors(
         focusedBorderColor = NeonCyan, unfocusedBorderColor = DividerColor,
         focusedLabelColor = NeonCyan, unfocusedLabelColor = TextSecondary,
         cursorColor = NeonCyan, focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary,
     )
 
+    // Import URL dialog
+    if (showImportDialog) {
+        AlertDialog(
+            onDismissRequest = { showImportDialog = false; importError = "" },
+            containerColor = CyberSurface,
+            title = {
+                Text("Import Server URL", color = NeonCyan,
+                    fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "vless://, vmess://, trojan:// URL পেস্ট করুন",
+                        color = TextSecondary, fontSize = 12.sp
+                    )
+                    OutlinedTextField(
+                        value = importUrl,
+                        onValueChange = { importUrl = it; importError = "" },
+                        placeholder = { Text("vless://...", color = TextSecondary.copy(alpha = 0.4f), fontSize = 11.sp) },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = colors,
+                        shape = RoundedCornerShape(8.dp),
+                        minLines = 3,
+                        maxLines = 5,
+                    )
+                    if (importError.isNotBlank()) {
+                        Text(importError, color = NeonRed, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val parsed = vm.importFromUrl(importUrl.trim())
+                    if (parsed != null) {
+                        name = parsed.name
+                        host = parsed.host
+                        port = parsed.port.toString()
+                        protocol = parsed.protocol
+                        uuid = parsed.uuid
+                        password = parsed.password
+                        sni = parsed.sni
+                        path = parsed.path
+                        network = parsed.network
+                        tls = parsed.tls
+                        checkStatus = ""
+                        showImportDialog = false
+                        importUrl = ""
+                        importError = ""
+                    } else {
+                        importError = "URL পার্স করা গেল না। সঠিক VLESS/VMess/Trojan URL দিন।"
+                    }
+                }) {
+                    Text("Import", color = NeonCyan, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showImportDialog = false; importError = "" }) {
+                    Text("Cancel", color = TextSecondary)
+                }
+            }
+        )
+    }
+
     Scaffold(
         containerColor = CyberBg,
         topBar = {
             TopAppBar(
-                title = { Text(if (existingConfig != null) "Edit Server" else "Add Server",
-                    color = NeonCyan, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold) },
+                title = {
+                    Text(
+                        if (existingConfig != null) "Edit Server" else "Add Server",
+                        color = NeonCyan, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, null, tint = TextSecondary) }
+                },
+                actions = {
+                    IconButton(onClick = { showImportDialog = true }) {
+                        Icon(Icons.Default.ContentPaste, null, tint = NeonCyan)
+                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = CyberBg)
             )
@@ -114,6 +207,79 @@ fun AddServerScreen(
                 .verticalScroll(rememberScrollState()).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+
+            // ── Import URL Banner ───────────────────────────────────────────────
+            Button(
+                onClick = { showImportDialog = true },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = NeonCyan.copy(alpha = 0.15f),
+                    contentColor = NeonCyan
+                ),
+                shape = RoundedCornerShape(10.dp),
+            ) {
+                Icon(Icons.Default.ContentPaste, null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.size(8.dp))
+                Text(
+                    "URL থেকে Import করুন  (VLESS / VMess / Trojan)",
+                    fontSize = 12.sp, fontFamily = FontFamily.Monospace
+                )
+            }
+
+            // ── Server Check ────────────────────────────────────────────────────
+            if (host.isNotBlank()) {
+                Row(
+                    Modifier.fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(CyberSurface)
+                        .border(1.dp, DividerColor, RoundedCornerShape(10.dp))
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text("SERVER CHECK", color = TextSecondary, fontSize = 9.sp,
+                            fontFamily = FontFamily.Monospace, letterSpacing = 2.sp)
+                        if (checkStatus.isNotBlank()) {
+                            Text(
+                                checkStatus,
+                                color = when {
+                                    checkStatus.startsWith("Online") -> NeonCyan
+                                    checkStatus.startsWith("Offline") -> NeonRed
+                                    else -> NeonBlue
+                                },
+                                fontSize = 12.sp, fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                    if (checkLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            color = NeonCyan, strokeWidth = 2.dp
+                        )
+                    } else {
+                        IconButton(
+                            onClick = {
+                                val p = port.toIntOrNull() ?: 443
+                                if (host.isNotBlank()) {
+                                    checkLoading = true
+                                    checkStatus = "Checking..."
+                                    vm.checkServerOnline(host.trim(), p) { online, ms ->
+                                        checkLoading = false
+                                        checkStatus = if (online) "Online ✓  ($ms ms)" else "Offline ✗  (timeout)"
+                                    }
+                                }
+                            },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(Icons.Default.NetworkCheck, null, tint = NeonCyan, modifier = Modifier.size(20.dp))
+                        }
+                    }
+                }
+            }
+
+            // ── Protocol ─────────────────────────────────────────────────────────
             SectionLabel("PROTOCOL")
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Protocol.entries.forEach { p ->
@@ -129,8 +295,8 @@ fun AddServerScreen(
             }
 
             CField("Server Name", name, { name = it }, colors = colors)
-            CField("Host / IP", host, { host = it }, "e.g. sg1.example.com", colors = colors)
-            CField("Port", port, { port = it }, "443", KeyboardType.Number, colors = colors)
+            CField("Host / IP", host, { host = it; checkStatus = "" }, "e.g. sg1.example.com", colors = colors)
+            CField("Port", port, { port = it; checkStatus = "" }, "443", KeyboardType.Number, colors = colors)
 
             when (protocol) {
                 Protocol.VMESS, Protocol.VLESS -> CField("UUID", uuid, { uuid = it }, "xxxxxxxx-...", colors = colors)
@@ -139,8 +305,8 @@ fun AddServerScreen(
                 Protocol.OVPN -> CField(".ovpn content", password, { password = it }, colors = colors)
             }
 
-            SectionLabel("SNI / BYPASS")
-            CField("SNI Host (bypass)", sni, { sni = it }, "e.g. cdn.cloudflare.com", colors = colors)
+            SectionLabel("SNI / BYPASS HOST")
+            CField("SNI Host (bypass)", sni, { sni = it }, "e.g. t.me", colors = colors)
 
             if (protocol != Protocol.SSH && protocol != Protocol.OVPN) {
                 SectionLabel("TRANSPORT")

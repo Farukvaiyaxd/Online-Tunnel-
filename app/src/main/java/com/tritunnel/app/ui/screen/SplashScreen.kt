@@ -47,12 +47,12 @@ fun SplashScreen(onFinished: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                "TRI",
+                "ONLINE",
                 color = NeonCyan,
-                fontSize = 56.sp,
+                fontSize = 48.sp,
                 fontWeight = FontWeight.Black,
                 fontFamily = FontFamily.Monospace,
-                letterSpacing = 12.sp,
+                letterSpacing = 8.sp,
             )
             Text(
                 "TUNNEL",
